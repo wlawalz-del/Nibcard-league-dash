@@ -4,26 +4,116 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>FPL Mini-League Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
 </head>
-<body>
-  <h1>FPL Dashboard</h1>
-  <div id="output">Loading...</div>
+<body class="bg-gray-100 p-4">
+  <h1 class="text-2xl font-bold mb-4">⚽ FPL Mini-League Dashboard</h1>
+
+  <!-- KPIs -->
+  <div id="kpis" class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6"></div>
+
+  <!-- Charts -->
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+    <canvas id="chartTop10"></canvas>
+    <canvas id="chartGW"></canvas>
+  </div>
+
+  <!-- Table -->
+  <div class="bg-white shadow rounded p-4">
+    <h2 class="text-xl font-bold mb-2">League Table</h2>
+    <table class="table-auto w-full text-left border-collapse" id="leagueTable">
+      <thead>
+        <tr class="bg-gray-200">
+          <th class="px-2 py-1">Rank</th>
+          <th class="px-2 py-1">Manager</th>
+          <th class="px-2 py-1">GW Points</th>
+          <th class="px-2 py-1">Total Points</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
 
   <script>
+    // Use your Netlify proxy function
     const apiStandings = (leagueId, page=1) =>
       `/.netlify/functions/standings?leagueId=${leagueId}&page=${page}`;
 
-    async function load(){
+    async function loadLeague(leagueId=543395) {
+      const res = await fetch(apiStandings(leagueId,1));
+      const data = await res.json();
+      return data.standings.results;
+    }
+
+    function renderKPIs(teams) {
+      const leader = teams[0];
+      const gwBest = teams.reduce((a,b)=> a.event_total > b.event_total ? a : b);
+      const gwWorst = teams.reduce((a,b)=> a.event_total < b.event_total ? a : b);
+      const avgScore = Math.round(teams.reduce((a,b)=>a+b.event_total,0)/teams.length);
+
+      document.getElementById('kpis').innerHTML = `
+        <div class="bg-white p-4 rounded shadow"><p class="text-gray-500">League Leader</p><p class="text-xl font-bold">${leader.player_name} (${leader.total} pts)</p></div>
+        <div class="bg-white p-4 rounded shadow"><p class="text-gray-500">Best GW</p><p class="text-xl font-bold">${gwBest.player_name} (${gwBest.event_total} pts)</p></div>
+        <div class="bg-white p-4 rounded shadow"><p class="text-gray-500">Worst GW</p><p class="text-xl font-bold">${gwWorst.player_name} (${gwWorst.event_total} pts)</p></div>
+        <div class="bg-white p-4 rounded shadow"><p class="text-gray-500">Average GW</p><p class="text-xl font-bold">${avgScore} pts</p></div>
+      `;
+    }
+
+    function renderCharts(teams) {
+      const ctx1 = document.getElementById('chartTop10').getContext('2d');
+      new Chart(ctx1, {
+        type: 'bar',
+        data: {
+          labels: teams.slice(0,10).map(t=>t.player_name),
+          datasets: [{
+            label: 'Total Points',
+            data: teams.slice(0,10).map(t=>t.total),
+            backgroundColor: 'rgba(54, 162, 235, 0.7)'
+          }]
+        },
+        options: { plugins: { datalabels: { anchor: 'end', align: 'top' }}, responsive:true }
+      });
+
+      const ctx2 = document.getElementById('chartGW').getContext('2d');
+      new Chart(ctx2, {
+        type: 'bar',
+        data: {
+          labels: teams.map(t=>t.player_name),
+          datasets: [{
+            label: 'GW Points',
+            data: teams.map(t=>t.event_total),
+            backgroundColor: 'rgba(255, 99, 132, 0.7)'
+          }]
+        },
+        options: { plugins: { datalabels: { anchor: 'end', align: 'top' }}, responsive:true }
+      });
+    }
+
+    function renderTable(teams) {
+      const tbody = document.querySelector('#leagueTable tbody');
+      tbody.innerHTML = teams.map((t,i)=>`
+        <tr class="${i%2?'bg-gray-50':''}">
+          <td class="px-2 py-1">${i+1}</td>
+          <td class="px-2 py-1">${t.player_name}</td>
+          <td class="px-2 py-1">${t.event_total}</td>
+          <td class="px-2 py-1">${t.total}</td>
+        </tr>
+      `).join('');
+    }
+
+    async function init() {
       try {
-        const res = await fetch(apiStandings(543395,1));
-        const data = await res.json();
-        document.getElementById('output').textContent =
-          'League loaded: ' + (data.standings?.results?.length || 0) + ' teams';
+        const teams = await loadLeague();
+        renderKPIs(teams);
+        renderCharts(teams);
+        renderTable(teams);
       } catch (err) {
-        document.getElementById('output').textContent = 'Error: ' + err;
+        document.body.innerHTML = `<p class="text-red-600">Error loading league: ${err}</p>`;
       }
     }
-    load();
+    init();
   </script>
 </body>
 </html>
