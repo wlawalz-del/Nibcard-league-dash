@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>FPL Mini-League Dashboard</title>
+</head>
+<body>
+  <h1>FPL Dashboard</h1>
+  <div id="output">Loading...</div>
+
+  <script>
+    const apiStandings = (leagueId, page=1) =>
+      `/.netlify/functions/standings?leagueId=${leagueId}&page=${page}`;
+
+    async function load(){
+      try {
+        const res = await fetch(apiStandings(543395,1));
+        const data = await res.json();
+        document.getElementById('output').textContent =
+          'League loaded: ' + (data.standings?.results?.length || 0) + ' teams';
+      } catch (err) {
+        document.getElementById('output').textContent = 'Error: ' + err;
+      }
+    }
+    load();
+  </script>
+</body>
+</html>
