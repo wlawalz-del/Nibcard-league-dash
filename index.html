@@ -1,0 +1,539 @@
+<!doctype html>
+<html lang="en" class="h-full">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Nibcard FPL Dashboard</title>
+
+  <!-- Tailwind -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Chart.js + Datalabels -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
+
+  <!-- Share image -->
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+
+  <style>
+    /* Soft/faded dice background + gentle gradients */
+    body {
+      background:
+        radial-gradient(1250px 500px at 50% -20%, rgba(16,185,129,0.08), transparent 60%),
+        radial-gradient(900px 400px at 120% 0%, rgba(99,102,241,0.08), transparent 60%),
+        url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="160" height="160" viewBox="0 0 160 160" fill="none"><g opacity="0.06"><rect x="16" y="16" width="64" height="64" rx="12" stroke="%23000" stroke-width="3"/><circle cx="48" cy="48" r="6" fill="%23000"/><rect x="80" y="80" width="64" height="64" rx="12" stroke="%23000" stroke-width="3"/><circle cx="96" cy="96" r="6" fill="%23000"/><circle cx="128" cy="112" r="6" fill="%23000"/><circle cx="112" cy="128" r="6" fill="%23000"/></g></svg>');
+      background-size: auto, auto, 200px 200px;
+      background-attachment: fixed;
+    }
+    /* Sticky glass header */
+    .glass { backdrop-filter: blur(10px); background: linear-gradient(90deg, rgba(16,185,129,0.85), rgba(99,102,241,0.85)); }
+    .dark .glass { background: linear-gradient(90deg, rgba(16,185,129,0.35), rgba(99,102,241,0.35)); }
+
+    /* Card fade-in */
+    .fade-in { animation: fade 700ms ease-out both; }
+    @keyframes fade { from { opacity:0; transform: translateY(6px)} to {opacity:1; transform:none} }
+
+    /* Tabs underline state */
+    .tab-active { border-color: #10b981; color: #10b981; }
+    .dark .tab-active { border-color: #34d399; color: #34d399; }
+
+    /* Hide scrollbars on tabs row for nicer mobile swipe */
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+  </style>
+</head>
+<body class="h-full text-gray-900 dark:text-gray-100 dark:bg-gray-900">
+
+  <!-- Sticky Top Bar -->
+  <header class="sticky top-0 z-50 glass text-white">
+    <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <!-- EPL-style lion placeholder on gradient circle -->
+        <div class="w-10 h-10 rounded-full bg-gradient-to-br from-emerald-400 to-indigo-500 grid place-items-center text-2xl">🦁</div>
+        <div>
+          <div class="text-lg font-bold">Nibcard FPL</div>
+          <div class="text-xs opacity-90">Season 2024/25</div>
+        </div>
+      </div>
+      <div class="flex items-center gap-2">
+        <!-- Dark mode toggle -->
+        <button id="themeBtn" class="px-3 py-2 rounded-lg bg-black/20 hover:bg-black/30 dark:bg-white/10 dark:hover:bg-white/20 transition">
+          🌙 / ☀️
+        </button>
+        <!-- Share -->
+        <button id="shareBtn" class="px-3 py-2 rounded-lg bg-white/15 hover:bg-white/25 border border-white/30 transition">
+          📤 Share Image
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main -->
+  <main id="captureArea" class="max-w-7xl mx-auto px-4 pt-4 pb-10">
+    <!-- Controls -->
+    <div class="flex flex-wrap items-end gap-3 mb-4">
+      <div>
+        <label class="block text-sm opacity-70 mb-1">Classic League ID</label>
+        <input id="leagueId" class="px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white/80 dark:bg-gray-800/80" value="543395" />
+      </div>
+      <div>
+        <label class="block text-sm opacity-70 mb-1">H2H League ID</label>
+        <input id="h2hId" class="px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white/80 dark:bg-gray-800/80" value="1997131" />
+      </div>
+      <div>
+        <label class="block text-sm opacity-70 mb-1">Gameweek (label only)</label>
+        <input id="gwInput" type="number" min="1" max="38" placeholder="1" class="px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white/80 dark:bg-gray-800/80" />
+      </div>
+      <button id="loadBtn" class="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white">Refresh</button>
+      <div class="text-xs opacity-70" id="metaNote"></div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="border-b border-gray-200 dark:border-gray-700 mb-4 flex gap-2 overflow-x-auto no-scrollbar" id="tabs">
+      <button data-tab="overview" class="px-3 py-2 border-b-2 tab-active">Overview</button>
+      <button data-tab="specials" class="px-3 py-2 border-b-2 border-transparent">Wale’s Specials</button>
+      <button data-tab="table" class="px-3 py-2 border-b-2 border-transparent">League Table</button>
+    </div>
+
+    <!-- OVERVIEW TAB -->
+    <section id="tab-overview" class="space-y-4">
+      <!-- KPIs -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="rounded-xl shadow bg-white/90 dark:bg-gray-800/80 p-4 fade-in">
+          <div class="text-sm opacity-70">🏆 League Leader</div>
+          <div id="leaderTeam" class="text-lg font-semibold mt-1">—</div>
+          <div id="leaderMeta" class="opacity-80 text-sm">—</div>
+        </div>
+        <div class="rounded-xl shadow bg-white/90 dark:bg-gray-800/80 p-4 fade-in" style="animation-delay:80ms">
+          <div class="text-sm opacity-70">💥 Best GW</div>
+          <div id="bestGwTeam" class="text-lg font-semibold mt-1">—</div>
+          <div id="bestGwMeta" class="opacity-80 text-sm">—</div>
+        </div>
+        <div class="rounded-xl shadow bg-white/90 dark:bg-gray-800/80 p-4 fade-in" style="animation-delay:160ms">
+          <div class="text-sm opacity-70">😴 Worst GW</div>
+          <div id="worstGwTeam" class="text-lg font-semibold mt-1">—</div>
+          <div id="worstGwMeta" class="opacity-80 text-sm">—</div>
+        </div>
+        <div class="rounded-xl shadow bg-white/90 dark:bg-gray-800/80 p-4 fade-in" style="animation-delay:240ms">
+          <div class="text-sm opacity-70">📊 Average GW</div>
+          <div id="avgGwPoints" class="text-lg font-semibold mt-1">— pts</div>
+          <div id="countManagers" class="opacity-80 text-sm">— managers</div>
+        </div>
+      </div>
+
+      <!-- Charts -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div class="rounded-xl shadow bg-white/90 dark:bg-gray-800/80 p-4">
+          <div class="text-sm opacity-70 mb-2">Top 10 — Overall Points</div>
+          <canvas id="overallChart" height="260"></canvas>
+        </div>
+        <div class="rounded-xl shadow bg-white/90 dark:bg-gray-800/80 p-4">
+          <div class="text-sm opacity-70 mb-2">Top 10 — GW Points (live)</div>
+          <canvas id="gwChart" height="260"></canvas>
+        </div>
+      </div>
+
+      <!-- GW Progress (per manager team) -->
+      <div class="rounded-xl shadow bg-white/90 dark:bg-gray-800/80 p-4">
+        <div class="flex items-center justify-between mb-2">
+          <div class="text-sm opacity-70">📈 GW Progress — select a team</div>
+          <select id="managerSelect" class="px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white/80 dark:bg-gray-800/80"></select>
+        </div>
+        <canvas id="progressChart" height="220"></canvas>
+        <div id="progressNote" class="text-xs opacity-70 mt-2"></div>
+      </div>
+    </section>
+
+    <!-- WALE'S SPECIALS TAB -->
+    <section id="tab-specials" class="hidden space-y-4">
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div class="rounded-xl shadow bg-white/90 dark:bg-gray-800/80 p-4">
+          <div class="text-sm opacity-70">🏅 League Leader</div>
+          <div id="sp-leaderTeam" class="text-lg font-semibold">—</div>
+          <div id="sp-leaderMeta" class="text-sm opacity-80">—</div>
+        </div>
+        <div class="rounded-xl shadow bg-white/90 dark:bg-gray-800/80 p-4">
+          <div class="text-sm opacity-70">💥 Most Points in GW</div>
+          <div id="sp-mostTeam" class="text-lg font-semibold">—</div>
+          <div id="sp-mostMeta" class="text-sm opacity-80">—</div>
+        </div>
+        <div class="rounded-xl shadow bg-white/90 dark:bg-gray-800/80 p-4">
+          <div class="text-sm opacity-70">🤝 H2H Leader</div>
+          <div id="sp-h2hTeam" class="text-lg font-semibold">—</div>
+          <div id="sp-h2hMeta" class="text-sm opacity-80">—</div>
+        </div>
+      </div>
+
+      <!-- Variety chart: pie placeholder for Weeks at #1 (real data once you store history) -->
+      <div class="rounded-xl shadow bg-white/90 dark:bg-gray-800/80 p-4">
+        <div class="flex items-center justify-between mb-2">
+          <div class="text-sm opacity-70">🥧 Weeks at #1 (demo until history is saved)</div>
+          <div class="text-xs opacity-70">We’ll swap to real counts later</div>
+        </div>
+        <canvas id="pieWeeks" height="220"></canvas>
+      </div>
+    </section>
+
+    <!-- LEAGUE TABLE TAB -->
+    <section id="tab-table" class="hidden space-y-3">
+      <div class="rounded-xl shadow bg-white/90 dark:bg-gray-800/80 p-4">
+        <div class="flex items-center gap-2 mb-3">
+          <input id="search" placeholder="Search team or manager…" class="px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white/80 dark:bg-gray-800/80 w-full sm:w-96">
+          <button id="copyLeadersBtn" class="px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700">Copy Leaders</button>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="min-w-full text-sm" id="tbl">
+            <thead>
+              <tr class="[&>th]:px-3 [&>th]:py-2 text-left text-gray-500 dark:text-gray-400">
+                <th>Rank</th>
+                <th>Team (hover for manager)</th>
+                <th class="cursor-pointer" data-sort="event_total">GW ⬍</th>
+                <th class="cursor-pointer" data-sort="total">Total ⬍</th>
+              </tr>
+            </thead>
+            <tbody id="tbody" class="[&>tr>td]:px-3 [&>tr>td]:py-2"></tbody>
+          </table>
+        </div>
+        <div id="footnote" class="text-xs opacity-70 mt-2"></div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    // ------------------ CONFIG ------------------
+    const DEFAULT_CLASSIC = 543395;
+    const DEFAULT_H2H = 1997131;
+    const apiStandings = (leagueId, page=1) => `/.netlify/functions/standings?leagueId=${leagueId}&page=${page}`;
+    const apiH2H       = (leagueId, page=1) => `/.netlify/functions/h2h?leagueId=${leagueId}&page=${page}`;
+    const apiHistory   = (entryId)         => `/.netlify/functions/entryHistory?teamId=${entryId}`;
+
+    // ------------------ THEME ------------------
+    const themeBtn = document.getElementById('themeBtn');
+    const setTheme = (mode) => {
+      if(mode==='dark'){ document.documentElement.classList.add('dark'); localStorage.setItem('theme','dark'); }
+      else { document.documentElement.classList.remove('dark'); localStorage.setItem('theme','light'); }
+    };
+    setTheme(localStorage.getItem('theme')||'light');
+    themeBtn.onclick = () => setTheme(document.documentElement.classList.contains('dark')?'light':'dark');
+
+    // ------------------ SHARE IMAGE ------------------
+    document.getElementById('shareBtn').addEventListener('click', async () => {
+      const node = document.getElementById('captureArea');
+      const canvas = await html2canvas(node, { backgroundColor: null, useCORS: true, scale: 2 });
+      const link = document.createElement('a');
+      link.download = 'nibcard-fpl-dashboard.png';
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    });
+
+    // ------------------ TABS + SWIPE ------------------
+    const tabsEl = document.getElementById('tabs');
+    const tabButtons = [...tabsEl.querySelectorAll('button')];
+    const showTab = (name) => {
+      document.getElementById('tab-overview').classList.toggle('hidden', name!=='overview');
+      document.getElementById('tab-specials').classList.toggle('hidden', name!=='specials');
+      document.getElementById('tab-table').classList.toggle('hidden', name!=='table');
+      tabButtons.forEach(b=> b.classList.toggle('tab-active', b.dataset.tab===name));
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+    tabButtons.forEach(b=> b.addEventListener('click', ()=> showTab(b.dataset.tab)));
+    // Swipe
+    let touchX=null;
+    document.addEventListener('touchstart', e=> touchX = e.touches[0].clientX, {passive:true});
+    document.addEventListener('touchend', e=>{
+      if(touchX==null) return;
+      const dx = e.changedTouches[0].clientX - touchX;
+      if(Math.abs(dx)>60){
+        const order = ['overview','specials','table'];
+        const current = tabsEl.querySelector('.tab-active')?.dataset.tab || 'overview';
+        let idx = order.indexOf(current);
+        idx = dx<0 ? Math.min(idx+1, order.length-1) : Math.max(idx-1, 0);
+        showTab(order[idx]);
+      }
+      touchX=null;
+    }, {passive:true});
+
+    // ------------------ DATA + RENDER ------------------
+    let currentResults = [];
+    let overallChart, gwChart, progressChart, pieWeeks;
+    const palette = ['#10b981','#6366f1','#f43f5e','#f59e0b','#06b6d4','#84cc16','#a78bfa','#ef4444','#22d3ee','#eab308'];
+
+    const initials = (full='') => full.split(/\s+/).map(s=>s[0]||'').join('').slice(0,2).toUpperCase();
+
+    async function fetchClassic(leagueId){
+      const r = await fetch(apiStandings(leagueId,1), { headers: { 'cache-control':'no-cache' }});
+      if(!r.ok) throw new Error('Classic standings failed: '+r.status);
+      const j = await r.json();
+      return (j?.standings?.results) || [];
+    }
+
+    async function fetchH2H(leagueId){
+      const r = await fetch(apiH2H(leagueId,1), { headers: { 'cache-control':'no-cache' }});
+      if(!r.ok) throw new Error('H2H failed: '+r.status);
+      return await r.json();
+    }
+
+    async function fetchHistory(entryId){
+      const r = await fetch(apiHistory(entryId), { headers: { 'cache-control':'no-cache' }});
+      if(!r.ok) throw new Error('History missing');
+      return await r.json(); // [{gw, points, total_points}, ...]
+    }
+
+    function renderKPIs(results){
+      const byTotal = [...results].sort((a,b)=>b.total-a.total);
+      const byGW = [...results].sort((a,b)=>b.event_total-a.event_total);
+
+      const leader = byTotal[0];
+      const best = byGW[0];
+      const worst = byGW[byGW.length-1];
+
+      document.getElementById('leaderTeam').textContent = leader.entry_name;
+      document.getElementById('leaderMeta').textContent = `${leader.total} pts • ${leader.player_name}`;
+      document.getElementById('bestGwTeam').textContent = best.entry_name;
+      document.getElementById('bestGwMeta').textContent = `${best.event_total} pts • ${best.player_name}`;
+      document.getElementById('worstGwTeam').textContent = worst.entry_name;
+      document.getElementById('worstGwMeta').textContent = `${worst.event_total} pts • ${worst.player_name}`;
+
+      const avg = Math.round(results.reduce((s,r)=>s+(r.event_total||0),0)/Math.max(1,results.length));
+      document.getElementById('avgGwPoints').textContent = `${avg} pts`;
+      document.getElementById('countManagers').textContent = `${results.length} managers`;
+
+      // Specials
+      document.getElementById('sp-leaderTeam').textContent = leader.entry_name;
+      document.getElementById('sp-leaderMeta').textContent = `${leader.total} pts • ${leader.player_name}`;
+      document.getElementById('sp-mostTeam').textContent = best.entry_name;
+      document.getElementById('sp-mostMeta').textContent = `${best.event_total} pts • ${best.player_name}`;
+    }
+
+    function makeBar(ctx, labels, data, label, color){
+      return new Chart(ctx, {
+        type: 'bar',
+        data: { labels, datasets: [{ label, data, backgroundColor: color, borderRadius: 6 }] },
+        options: {
+          responsive: true,
+          animation: { duration: 900, easing: 'easeOutQuart' },
+          plugins: {
+            legend: { display:false },
+            datalabels: { color: '#9CA3AF', anchor: 'end', align: 'top', formatter: v => v }
+          },
+          scales: { x: { ticks: { maxRotation: 0 } }, y: { beginAtZero: true } }
+        },
+        plugins: [ChartDataLabels]
+      });
+    }
+
+    function renderCharts(results){
+      const topOverall = [...results].sort((a,b)=>b.total-a.total).slice(0,10);
+      const topGW = [...results].sort((a,b)=>b.event_total-a.event_total).slice(0,10);
+
+      overallChart && overallChart.destroy();
+      gwChart && gwChart.destroy();
+
+      overallChart = makeBar(
+        document.getElementById('overallChart'),
+        topOverall.map(x=>x.entry_name), // team name x-axis
+        topOverall.map(x=>x.total),
+        'Overall',
+        'rgba(99,102,241,0.85)'
+      );
+
+      gwChart = makeBar(
+        document.getElementById('gwChart'),
+        topGW.map(x=>x.entry_name),
+        topGW.map(x=>x.event_total),
+        'GW',
+        'rgba(16,185,129,0.9)'
+      );
+
+      // click bar -> jump to table row
+      const hook = (chart, srcArray) => {
+        chart.canvas.onclick = (evt) => {
+          const points = chart.getElementsAtEventForMode(evt, 'nearest', { intersect:true }, true);
+          if(points.length){
+            const idx = points[0].index;
+            const entryName = chart.data.labels[idx];
+            const found = srcArray.find(r=> r.entry_name===entryName);
+            if(found){
+              showTab('table');
+              const row = document.getElementById('row-'+found.entry);
+              if(row){ row.scrollIntoView({behavior:'smooth', block:'center'}); row.classList.add('bg-emerald-50'); setTimeout(()=>row.classList.remove('bg-emerald-50'), 1200); }
+            }
+          }
+        };
+      };
+      hook(overallChart, topOverall);
+      hook(gwChart, topGW);
+    }
+
+    function managerBadge(name){
+      const ini = initials(name);
+      return `<span class="inline-flex w-6 h-6 items-center justify-center rounded-full bg-indigo-500 text-white text-xs font-bold align-middle" title="${name}">${ini}</span>`;
+    }
+
+    function renderTable(results){
+      const q = (document.getElementById('search').value||'').toLowerCase();
+      const filtered = results.filter(r =>
+        (r.entry_name||'').toLowerCase().includes(q) || (r.player_name||'').toLowerCase().includes(q)
+      );
+      const tbody = document.getElementById('tbody');
+      tbody.innerHTML = filtered.map((r)=>`
+        <tr id="row-${r.entry}" class="border-t border-gray-200 dark:border-gray-700">
+          <td>${r.rank}</td>
+          <td>
+            <div class="flex items-center gap-2">
+              ${managerBadge(r.player_name)}
+              <div>
+                <div class="font-semibold">${r.entry_name}</div>
+                <div class="text-xs opacity-60">Manager: ${r.player_name}</div>
+              </div>
+            </div>
+          </td>
+          <td class="font-medium">${r.event_total}</td>
+          <td class="font-semibold">${r.total}</td>
+        </tr>
+      `).join('') || `<tr><td colspan="4" class="py-6 text-center opacity-70">No matches</td></tr>`;
+      document.getElementById('footnote').textContent =
+        `Updated: ${new Date().toLocaleString()} • Teams: ${results.length}`;
+    }
+
+    async function renderProgress(entryId, label){
+      try{
+        const series = await fetchHistory(entryId); // [{gw, points, total_points}]
+        const labels = series.map(s=>`GW${s.gw}`);
+        const pts = series.map(s=>s.points);
+
+        progressChart && progressChart.destroy();
+        progressChart = new Chart(document.getElementById('progressChart'), {
+          type: 'line',
+          data: { labels, datasets: [{
+            label,
+            data: pts,
+            borderColor: '#10b981',
+            backgroundColor: 'rgba(16,185,129,0.2)',
+            tension: 0.25,
+            pointRadius: 3,
+            fill: true
+          }]},
+          options: { responsive:true, animation:{ duration: 800 }, plugins:{legend:{display:false}}, scales:{ y:{ beginAtZero:true } } }
+        });
+        document.getElementById('progressNote').textContent = '';
+      }catch(e){
+        // Friendly demo if history function not yet available
+        progressChart && progressChart.destroy();
+        const labels = Array.from({length: 8}, (_,i)=>`GW${i+1}`);
+        const demo = labels.map((_,i)=> Math.round(45 + 10*Math.sin(i/1.3) + (i*0.8)));
+        progressChart = new Chart(document.getElementById('progressChart'), {
+          type: 'line',
+          data: { labels, datasets: [{
+            label: label + ' (demo)',
+            data: demo,
+            borderColor: '#f59e0b',
+            backgroundColor: 'rgba(245,158,11,0.2)',
+            tension: 0.3,
+            pointRadius: 3,
+            fill: true
+          }]},
+          options: { responsive:true, animation:{duration:700}, plugins:{legend:{display:false}}, scales:{ y:{beginAtZero:true}} }
+        });
+        document.getElementById('progressNote').textContent = 'Tip: /entryHistory function shows real GW progress.';
+      }
+    }
+
+    function renderPieWeeks(leaderTeam){
+      pieWeeks && pieWeeks.destroy();
+      // demo split with leader favored
+      const labels = [leaderTeam, 'Challenger A', 'Challenger B'];
+      const data = [5, 2, 1];
+      pieWeeks = new Chart(document.getElementById('pieWeeks'), {
+        type: 'pie',
+        data: { labels, datasets: [{ data, backgroundColor: ['#10b981','#6366f1','#f43f5e'] }] },
+        options: { responsive:true, animation:{duration:700} }
+      });
+    }
+
+    // Copy leaders text for your chat
+    document.getElementById('copyLeadersBtn')?.addEventListener('click', ()=>{
+      if(!currentResults.length) return;
+      const leader = [...currentResults].sort((a,b)=>b.total-a.total)[0];
+      const best = [...currentResults].sort((a,b)=>b.event_total-a.event_total)[0];
+      const gw = document.getElementById('gwInput').value || '1';
+      const text = `
+GAMEWEEK ${gw}
+
+🏅 League Leaders
+- General ${leader.entry_name} (${leader.total} pts)
+
+🏆 Most Points in GW ${gw}
+- General ${best.entry_name} (${best.event_total} pts)
+      `.trim();
+      navigator.clipboard.writeText(text);
+      alert('Leaders copied!');
+    });
+
+    // Table search & sorting
+    document.getElementById('search')?.addEventListener('input', ()=> renderTable(currentResults));
+    document.querySelectorAll('th[data-sort]').forEach(th=>{
+      th.addEventListener('click', ()=>{
+        const f = th.dataset.sort;
+        currentResults.sort((a,b)=> (b[f]??0) - (a[f]??0));
+        renderKPIs(currentResults);
+        renderCharts(currentResults);
+        renderTable(currentResults);
+      });
+    });
+
+    function populateManagerSelect(results){
+      const sel = document.getElementById('managerSelect');
+      sel.innerHTML = results.map(r=> `<option value="${r.entry}">${r.entry_name}</option>`).join('');
+      sel.onchange = (e)=> renderProgress(e.target.value, sel.selectedOptions[0].textContent);
+      if(results[0]) renderProgress(results[0].entry, results[0].entry_name);
+    }
+
+    async function load(){
+      const classicId = (document.getElementById('leagueId').value || '').trim() || DEFAULT_CLASSIC;
+      const h2hId = (document.getElementById('h2hId').value || '').trim() || DEFAULT_H2H;
+
+      document.getElementById('loadBtn').disabled = true;
+      try{
+        const results = await fetchClassic(classicId);
+        currentResults = results.map(r=>({
+          rank: r.rank, entry_name: r.entry_name, player_name: r.player_name,
+          total: r.total, event_total: r.event_total, entry: r.entry
+        }));
+
+        renderKPIs(currentResults);
+        renderCharts(currentResults);
+        renderPieWeeks(currentResults[0]?.entry_name || 'Leader');
+        renderTable(currentResults);
+        populateManagerSelect(currentResults);
+        document.getElementById('metaNote').textContent = `Teams: ${currentResults.length}`;
+
+        // H2H
+        try {
+          const h2h = await fetchH2H(h2hId);
+          if(h2h && (h2h.teamName || h2h.leaderName)){
+            const name = h2h.teamName || h2h.leaderName;
+            const meta = `${h2h.points ?? '—'} pts`;
+            document.getElementById('sp-h2hTeam').textContent = name || '—';
+            document.getElementById('sp-h2hMeta').textContent = meta;
+          } else {
+            document.getElementById('sp-h2hMeta').textContent = 'Unavailable';
+          }
+        } catch(e){
+          document.getElementById('sp-h2hMeta').textContent = 'Unavailable';
+        }
+      }catch(e){
+        alert('Failed to load league: ' + e.message);
+      }finally{
+        document.getElementById('loadBtn').disabled = false;
+      }
+    }
+
+    document.getElementById('loadBtn').addEventListener('click', load);
+
+    // Initial boot
+    showTab('overview');
+    load();
+  </script>
+</body>
+</html>
