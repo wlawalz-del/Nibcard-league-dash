@@ -1,24 +1,25 @@
-export async function handler(event, context) {
-  const { leagueId, page } = event.queryStringParameters;
-  const url = `https://fantasy.premierleague.com/api/leagues-classic/${leagueId}/standings/?page_new_entries=1&page_standings=${page||1}&phase=1`;
-
+exports.handler = async (event) => {
   try {
-    const res = await fetch(url);
-    const data = await res.json();
+    const leagueId = event.queryStringParameters.leagueId;
+    const page = event.queryStringParameters.page || 1;
 
+    if (!leagueId) {
+      return { statusCode: 400, body: JSON.stringify({ error: "Missing leagueId" }) };
+    }
+
+    const resp = await fetch(
+      `https://fantasy.premierleague.com/api/leagues-classic/${leagueId}/standings/?page_standings=${page}`,
+      { headers: { "User-Agent": "Mozilla/5.0" } }
+    );
+
+    if (!resp.ok) throw new Error("Failed to fetch classic league standings");
+
+    const data = await resp.json();
     return {
       statusCode: 200,
-      headers: {
-        "Access-Control-Allow-Origin": "*",   // ✅ fixes CORS
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify(data)
+      body: JSON.stringify(data),
     };
   } catch (err) {
-    return {
-      statusCode: 500,
-      headers: { "Access-Control-Allow-Origin": "*" },
-      body: JSON.stringify({ error: err.message })
-    };
+    return { statusCode: 500, body: JSON.stringify({ error: err.message }) };
   }
-}
+};
