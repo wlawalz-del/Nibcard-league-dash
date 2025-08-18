@@ -3,71 +3,25 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Nibcard FPL Dashboard</title>
-  <style>
-    body {
-      font-family: sans-serif;
-      padding: 2rem;
-    }
-    .section {
-      margin-bottom: 2rem;
-    }
-    pre {
-      background: #f0f0f0;
-      padding: 1rem;
-      border-radius: 6px;
-      overflow: auto;
-    }
-  </style>
+  <title>FPL Dashboard Test</title>
 </head>
 <body>
-  <h1>Nibcard FPL Dashboard 🦁</h1>
-
-  <div class="section" id="standings">
-    <h2>Classic League Standings</h2>
-    <pre id="standingsOut">Loading...</pre>
-  </div>
-
-  <div class="section" id="h2h">
-    <h2>H2H League Leader</h2>
-    <pre id="h2hOut">Loading...</pre>
-  </div>
-
-  <div class="section" id="captains">
-    <h2>Most Popular Captain</h2>
-    <pre id="captainsOut">Loading...</pre>
-  </div>
+  <h1>Ping Test</h1>
+  <pre id="pingOut">Loading...</pre>
 
   <script>
-    async function loadDashboard() {
+    async function testPing() {
       try {
-        // Classic standings
-        const standingsRes = await fetch('/.netlify/functions/standings?leagueId=543395');
-        const standings = await standingsRes.json();
-        console.log("Standings:", standings);
-        document.getElementById("standingsOut").textContent = JSON.stringify(standings, null, 2);
-
-        // H2H leader
-        const h2hRes = await fetch('/.netlify/functions/h2h?leagueId=1997131');
-        const h2h = await h2hRes.json();
-        console.log("H2H:", h2h);
-        document.getElementById("h2hOut").textContent = JSON.stringify(h2h, null, 2);
-
-        // Captains
-        const captainsRes = await fetch('/.netlify/functions/captains?leagueId=543395');
-        const captains = await captainsRes.json();
-        console.log("Captains:", captains);
-        document.getElementById("captainsOut").textContent = JSON.stringify(captains, null, 2);
-
+        const res = await fetch('/.netlify/functions/ping');
+        const data = await res.json();
+        console.log("Ping result:", data);
+        document.getElementById("pingOut").textContent = JSON.stringify(data, null, 2);
       } catch (err) {
-        console.error("Fetch error:", err);
-        document.querySelectorAll("pre").forEach(pre => {
-          pre.textContent = "Error loading data. Check console for details.";
-        });
+        console.error("Ping fetch failed:", err);
+        document.getElementById("pingOut").textContent = "Error: " + err.message;
       }
     }
-
-    loadDashboard();
+    testPing();
   </script>
 </body>
 </html>
