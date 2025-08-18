@@ -3,26 +3,26 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>H2H Test</title>
+  <title>Captains Test</title>
 </head>
 <body>
-  <h1>H2H Leader</h1>
+  <h1>Most Popular Captain</h1>
   <pre id="out">Loading...</pre>
 
   <script>
-    async function testH2H() {
+    async function testCaptains() {
       try {
-        const res = await fetch('/.netlify/functions/h2h?leagueId=1997131');
+        const res = await fetch('/.netlify/functions/captains?leagueId=543395');
         console.log("Response status:", res.status);
         const data = await res.json();
-        console.log("H2H result:", data);
+        console.log("Captains result:", data);
         document.getElementById("out").textContent = JSON.stringify(data, null, 2);
       } catch (err) {
-        console.error("H2H fetch failed:", err);
+        console.error("Captains fetch failed:", err);
         document.getElementById("out").textContent = "Error: " + err.message;
       }
     }
-    testH2H();
+    testCaptains();
   </script>
 </body>
 </html>
