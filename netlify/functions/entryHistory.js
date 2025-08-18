@@ -1,30 +1,22 @@
+const { ok, bad, handleOptions, fetchJson } = require('./_utils');
+
 exports.handler = async (event) => {
+  if (event.httpMethod === 'OPTIONS') return handleOptions();
+
   try {
-    const teamId = event.queryStringParameters.teamId;
+    const { teamId } = event.queryStringParameters || {};
+    if (!teamId) return bad(400, 'Missing teamId');
 
-    if (!teamId) {
-      return { statusCode: 400, body: JSON.stringify({ error: "Missing teamId" }) };
-    }
+    const url = `https://fantasy.premierleague.com/api/entry/${teamId}/history/`;
+    const data = await fetchJson(url);
 
-    const resp = await fetch(
-      `https://fantasy.premierleague.com/api/entry/${teamId}/history/`,
-      { headers: { "User-Agent": "Mozilla/5.0" } }
-    );
-
-    if (!resp.ok) throw new Error("Failed to fetch entry history");
-
-    const data = await resp.json();
-    const history = (data?.current || []).map(h => ({
-      gw: h.event,
-      points: h.points,
-      total_points: h.total_points,
+    const rows = (data.current || []).map(r => ({
+      gw: r.event,
+      total_points: r.total_points
     }));
 
-    return {
-      statusCode: 200,
-      body: JSON.stringify(history),
-    };
+    return ok(rows);
   } catch (err) {
-    return { statusCode: 500, body: JSON.stringify({ error: err.message }) };
+    return bad(500, `entryHistory error: ${err.message}`);
   }
 };
