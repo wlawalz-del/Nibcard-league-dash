@@ -3,25 +3,26 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>FPL Dashboard Test</title>
+  <title>Standings Test</title>
 </head>
 <body>
-  <h1>Ping Test</h1>
-  <pre id="pingOut">Loading...</pre>
+  <h1>Classic League Standings</h1>
+  <pre id="out">Loading...</pre>
 
   <script>
-    async function testPing() {
+    async function testStandings() {
       try {
-        const res = await fetch('/.netlify/functions/ping');
+        const res = await fetch('/.netlify/functions/standings?leagueId=543395');
+        console.log("Response status:", res.status);
         const data = await res.json();
-        console.log("Ping result:", data);
-        document.getElementById("pingOut").textContent = JSON.stringify(data, null, 2);
+        console.log("Standings result:", data);
+        document.getElementById("out").textContent = JSON.stringify(data, null, 2);
       } catch (err) {
-        console.error("Ping fetch failed:", err);
-        document.getElementById("pingOut").textContent = "Error: " + err.message;
+        console.error("Standings fetch failed:", err);
+        document.getElementById("out").textContent = "Error: " + err.message;
       }
     }
-    testPing();
+    testStandings();
   </script>
 </body>
 </html>
