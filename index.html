@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>NIBCARD FPL Dashboard</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -19,6 +20,19 @@
       text-align: center;
       font-size: 1.5em;
       font-weight: bold;
+      position: sticky;
+      top: 0;
+      z-index: 1000;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    header button {
+      background: white;
+      border: none;
+      padding: 6px 12px;
+      border-radius: 6px;
+      cursor: pointer;
     }
     .container {
       padding: 20px;
@@ -48,30 +62,159 @@
       border-radius: 10px;
       box-shadow: 0 2px 6px rgba(0,0,0,0.1);
     }
-    pre {
+    .accordion {
+      margin-top: 20px;
+    }
+    .accordion-item {
+      margin-bottom: 10px;
+      border-radius: 6px;
+      overflow: hidden;
+      border: 1px solid #ddd;
+    }
+    .accordion-header {
       background: #f4f4f4;
       padding: 10px;
-      border-radius: 6px;
-      max-height: 300px;
-      overflow: auto;
-      font-size: 0.8em;
+      cursor: pointer;
+      font-weight: bold;
+    }
+    .accordion-content {
+      display: none;
+      padding: 10px;
+      background: white;
+    }
+    .accordion-item.active .accordion-content {
+      display: block;
     }
   </style>
 </head>
 <body>
-  <header>NIBCARD FPL Dashboard</header>
+  <header>
+    NIBCARD FPL Dashboard
+    <button onclick="shareImage()">📤 Share</button>
+  </header>
 
-  <div class="container">
+  <div class="container" id="shareArea">
     <!-- KPI Cards -->
     <div class="kpi">
       <div class="card" id="leagueLeader">League Leader: Loading...</div>
       <div class="card" id="h2hLeader">H2H Leader: Loading...</div>
-      <div class="card" id="captainPick">Most Popular Captain: Loading...</div>
+      <div class="card" id="bestGw">Best GW: Loading...</div>
     </div>
 
     <!-- Charts -->
     <canvas id="mostPointsChart" height="100"></canvas>
-    <canvas id="gwProgressChart" height="100"></canvas>
+    <canvas id="gwNo1Pie" height="100"></canvas>
+
+    <!-- Accordion for Wale’s Specials -->
+    <div class="accordion">
+      <div class="accordion-item">
+        <div class="accordion-header">Wale’s Specials</div>
+        <div class="accordion-content">
+          <p id="worstGw">Worst GW: Loading...</p>
+          <p id="captainPick">Most Popular Captain: Loading...</p>
+          <p id="leastCaptain">Least Popular Captain: Loading...</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+  async function loadDashboard() {
+    try {
+      // === FETCH LEAGUE DATA ===
+      const standingsRes = await fetch('/.netlify/functions/standings?leagueId=543395');
+      const standings = await standingsRes.json();
+
+      const h2hRes = await fetch('/.netlify/functions/h2h?leagueId=1997131');
+      const h2h = await h2hRes.json();
+
+      const captainsRes = await fetch('/.netlify/functions/captains?leagueId=543395');
+      const captains = await captainsRes.json();
+
+      // === KPIs ===
+      const leader = standings.standings.results[0];
+      document.getElementById("leagueLeader").textContent =
+        `League Leader: ${leader.entry_name} (${leader.player_name}) - ${leader.total} pts`;
+
+      const h2hLeader = h2h.standings.results[0];
+      document.getElementById("h2hLeader").textContent =
+        `H2H Leader: ${h2hLeader.entry_name} (${h2hLeader.player_name}) - ${h2hLeader.total} pts`;
+
+      const bestGw = standings.standings.results.reduce((a,b) => a.event_total > b.event_total ? a : b);
+      document.getElementById("bestGw").textContent =
+        `Most Points in GW: ${bestGw.entry_name} (${bestGw.player_name}) - ${bestGw.event_total} pts`;
+
+      // === Wale’s Specials ===
+      const worstGw = standings.standings.results.reduce((a,b) => a.event_total < b.event_total ? a : b);
+      document.getElementById("worstGw").textContent =
+        `Worst GW: ${worstGw.entry_name} (${worstGw.player_name}) - ${worstGw.event_total} pts`;
+
+      const captainPick = captains.mostPopular || { name: "N/A", count: 0 };
+      document.getElementById("captainPick").textContent =
+        `Most Popular Captain: ${captainPick.name} (${captainPick.count} picks)`;
+
+      const leastCaptain = captains.leastPopular || { name: "N/A", count: 0 };
+      document.getElementById("leastCaptain").textContent =
+        `Least Popular Captain: ${leastCaptain.name} (${leastCaptain.count} picks)`;
+
+      // === BAR CHART ===
+      new Chart(document.getElementById('mostPointsChart'), {
+        type: 'bar',
+        data: {
+          labels: standings.standings.results.slice(0,5).map(t => t.entry_name),
+          datasets: [{
+            label: 'Total Points',
+            data: standings.standings.results.slice(0,5).map(t => t.total),
+            backgroundColor: '#4e79a7'
+          }]
+        },
+        options: { responsive: true, plugins: { legend: { display: false } } }
+      });
+
+      // === PIE CHART (Most weeks at No.1 placeholder) ===
+      new Chart(document.getElementById('gwNo1Pie'), {
+        type: 'pie',
+        data: {
+          labels: standings.standings.results.slice(0,3).map(t => t.entry_name),
+          datasets: [{
+            data: [5, 3, 2], // placeholder numbers
+            backgroundColor: ['#f28e2c','#4e79a7','#e15759']
+          }]
+        },
+        options: {
+          responsive: true,
+          plugins: {
+            title: { display: true, text: "Most Weeks at No.1" }
+          }
+        }
+      });
+
+    } catch (err) {
+      console.error("Dashboard fetch failed:", err);
+      document.getElementById("leagueLeader").textContent = "Error loading dashboard ❌";
+    }
+  }
+  loadDashboard();
+
+  // === Accordion toggle ===
+  document.querySelectorAll('.accordion-header').forEach(header => {
+    header.addEventListener('click', () => {
+      header.parentElement.classList.toggle('active');
+    });
+  });
+
+  // === Share as Image ===
+  async function shareImage() {
+    const area = document.getElementById("shareArea");
+    const canvas = await html2canvas(area, { backgroundColor: null, scale: 2 });
+    const link = document.createElement("a");
+    link.download = "fpl-dashboard.png";
+    link.href = canvas.toDataURL();
+    link.click();
+  }
+  </script>
+</body>
+</html>
 
     <!-- Debug Raw JSON -->
     <h3>Raw Data (Debug)</h3>
