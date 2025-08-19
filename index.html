@@ -1,77 +1,173 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Nibcard FPL Dashboard</title>
-
-  <!-- Chart.js -->
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NIBCARD FPL Dashboard</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <!-- html2canvas -->
-  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
-
   <style>
     body {
       font-family: Arial, sans-serif;
       margin: 0; padding: 0;
-      background: linear-gradient(135deg, #f6d365 0%, #fda085 100%);
-      background-attachment: fixed;
+      background: linear-gradient(135deg, #f9f9f9, #eaeaea);
       color: #222;
     }
     header {
-      position: sticky; top: 0;
-      background: rgba(0,0,0,0.7);
-      color: #fff; padding: 1rem;
-      display: flex; justify-content: space-between; align-items: center;
-      z-index: 100;
+      background: #4e79a7;
+      color: white;
+      padding: 15px;
+      text-align: center;
+      font-size: 1.5em;
+      font-weight: bold;
     }
-    header h1 { margin: 0; font-size: 1.2rem; }
-    .btn {
-      background: #fff; border: none; padding: .5rem 1rem;
-      border-radius: 5px; cursor: pointer;
+    .container {
+      padding: 20px;
+      max-width: 1000px;
+      margin: auto;
     }
-    .dark-mode {
-      background: #1e1e1e; color: #ddd;
+    .kpi {
+      display: flex;
+      gap: 15px;
+      flex-wrap: wrap;
+      margin-bottom: 25px;
     }
-    .dashboard { padding: 1rem; }
-    .cards { display: flex; flex-wrap: wrap; gap: 1rem; }
     .card {
-      flex: 1; min-width: 200px;
-      background: #fff; border-radius: 12px; padding: 1rem;
-      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-      transition: transform .2s;
+      background: white;
+      padding: 15px;
+      border-radius: 10px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+      flex: 1;
+      min-width: 250px;
+      text-align: center;
+      font-size: 1.1em;
     }
-    .card:hover { transform: translateY(-3px); }
-    canvas { background: #fff; border-radius: 12px; padding: 1rem; margin: 1rem 0; }
-    pre { background: rgba(0,0,0,0.1); padding: 1rem; border-radius: 8px; }
+    canvas {
+      margin-bottom: 30px;
+      background: white;
+      padding: 15px;
+      border-radius: 10px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+    }
+    pre {
+      background: #f4f4f4;
+      padding: 10px;
+      border-radius: 6px;
+      max-height: 300px;
+      overflow: auto;
+      font-size: 0.8em;
+    }
   </style>
 </head>
 <body>
-  <header>
-    <h1>Nibcard FPL Dashboard 🎲</h1>
-    <div>
-      <button class="btn" onclick="toggleDark()">🌙 Toggle Dark</button>
-      <button class="btn" onclick="shareDashboard()">📸 Share</button>
-    </div>
-  </header>
+  <header>NIBCARD FPL Dashboard</header>
 
-  <div class="dashboard" id="dashboard">
+  <div class="container">
     <!-- KPI Cards -->
-    <div class="cards">
-      <div class="card" id="leagueLeader">League Leader: loading...</div>
-      <div class="card" id="h2hLeader">H2H Leader: loading...</div>
-      <div class="card" id="captainPick">Most Popular Captain: loading...</div>
+    <div class="kpi">
+      <div class="card" id="leagueLeader">League Leader: Loading...</div>
+      <div class="card" id="h2hLeader">H2H Leader: Loading...</div>
+      <div class="card" id="captainPick">Most Popular Captain: Loading...</div>
     </div>
 
     <!-- Charts -->
-    <h2>Charts</h2>
-    <canvas id="mostPointsChart"></canvas>
-    <canvas id="gwProgressChart"></canvas>
-    <canvas id="mostWeeksChart"></canvas>
+    <canvas id="mostPointsChart" height="100"></canvas>
+    <canvas id="gwProgressChart" height="100"></canvas>
 
-    <!-- JSON Fallback -->
-    <h2>Raw Data (Debug)</h2>
-    <h3>Standings</h3><pre id="standingsOut">Loading...</pre>
+    <!-- Debug Raw JSON -->
+    <h3>Raw Data (Debug)</h3>
+    <h4>Standings</h4>
+    <pre id="standingsOut">Loading...</pre>
+    <h4>H2H</h4>
+    <pre id="h2hOut">Loading...</pre>
+    <h4>Captains</h4>
+    <pre id="captainsOut">Loading...</pre>
+  </div>
+
+  <script>
+  async function loadDashboard() {
+    try {
+      // === 1. FETCH DATA ===
+      const standingsRes = await fetch('/.netlify/functions/standings?leagueId=543395');
+      const standings = await standingsRes.json();
+      document.getElementById("standingsOut").textContent = JSON.stringify(standings, null, 2);
+
+      const h2hRes = await fetch('/.netlify/functions/h2h?leagueId=1997131');
+      const h2h = await h2hRes.json();
+      document.getElementById("h2hOut").textContent = JSON.stringify(h2h, null, 2);
+
+      const captainsRes = await fetch('/.netlify/functions/captains?leagueId=543395');
+      const captains = await captainsRes.json();
+      document.getElementById("captainsOut").textContent = JSON.stringify(captains, null, 2);
+
+      // === 2. KPI CARDS ===
+      const leader = standings.standings.results[0];
+      document.getElementById("leagueLeader").textContent =
+        `League Leader: ${leader.entry_name} (${leader.player_name}) - ${leader.total} pts`;
+
+      const h2hLeader = h2h.standings.results[0];
+      document.getElementById("h2hLeader").textContent =
+        `H2H Leader: ${h2hLeader.entry_name} (${h2hLeader.player_name}) - ${h2hLeader.total} pts`;
+
+      const captainPick = captains.mostPopular || { name: "N/A", count: 0 };
+      document.getElementById("captainPick").textContent =
+        `Most Popular Captain: ${captainPick.name} (${captainPick.count} picks)`;
+
+      // === 3. BAR CHART: Top 5 Total Points ===
+      new Chart(document.getElementById('mostPointsChart'), {
+        type: 'bar',
+        data: {
+          labels: standings.standings.results.slice(0,5).map(t => t.entry_name),
+          datasets: [{
+            label: 'Total Points',
+            data: standings.standings.results.slice(0,5).map(t => t.total),
+            backgroundColor: '#4e79a7'
+          }]
+        },
+        options: {
+          responsive: true,
+          plugins: { legend: { display: false } }
+        }
+      });
+
+      // === 4. LINE CHART: GW Progress for League Leader ===
+      const topTeamId = leader.entry;
+      const histRes = await fetch(`/.netlify/functions/entryHistory?teamId=${topTeamId}`);
+      const history = await histRes.json();
+
+      new Chart(document.getElementById('gwProgressChart'), {
+        type: 'line',
+        data: {
+          labels: history.current.map(h => `GW${h.event}`),
+          datasets: [{
+            label: leader.entry_name,
+            data: history.current.map(h => h.total_points),
+            borderColor: '#f28e2c',
+            fill: false,
+            tension: 0.2
+          }]
+        },
+        options: {
+          responsive: true,
+          plugins: {
+            title: {
+              display: true,
+              text: `GW Progress: ${leader.entry_name}`
+            }
+          }
+        }
+      });
+
+    } catch (err) {
+      console.error("Dashboard fetch failed:", err);
+      document.getElementById("leagueLeader").textContent = "Error loading dashboard ❌";
+    }
+  }
+
+  // Run when page loads
+  loadDashboard();
+  </script>
+</body>
+</html>
     <h3>H2H</h3><pre id="h2hOut">Loading...</pre>
     <h3>Captains</h3><pre id="captainsOut">Loading...</pre>
   </div>
