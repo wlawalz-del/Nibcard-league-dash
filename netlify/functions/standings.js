@@ -1,16 +1,16 @@
-const { ok, bad, handleOptions, fetchJson } = require('./_utils');
+// netlify/functions/standings.js
+import { fetchJson } from "./_utils.js";
 
-exports.handler = async (event) => {
-  if (event.httpMethod === 'OPTIONS') return handleOptions();
-
+export async function handler(event) {
   try {
-    const { leagueId, page = 1 } = event.queryStringParameters || {};
-    if (!leagueId) return bad(400, 'Missing leagueId');
-
-    const url = `https://fantasy.premierleague.com/api/leagues-classic/${leagueId}/standings/?page_standings=${page}`;
+    const leagueId = event.queryStringParameters.leagueId || "543395"; // default: NIBCARD
+    const url = `https://fantasy.premierleague.com/api/leagues-classic/${leagueId}/standings/`;
     const data = await fetchJson(url);
-    return ok(data);
+    return {
+      statusCode: 200,
+      body: JSON.stringify(data),
+    };
   } catch (err) {
-    return bad(500, `standings error: ${err.message}`);
+    return { statusCode: 500, body: JSON.stringify({ error: err.message }) };
   }
-};
+}
