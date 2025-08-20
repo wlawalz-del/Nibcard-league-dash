@@ -132,9 +132,13 @@
       const captains = await captainsRes.json();
 
       // === KPIs ===
-      const leader = standings.standings.results[0];
-      document.getElementById("leagueLeader").textContent =
-        `League Leader: ${leader.entry_name} (${leader.player_name}) - ${leader.total} pts`;
+      const leader = standings.standings.results[0];  
+if (leader) {
+  document.getElementById("leagueLeader").textContent =
+    `League Leader: ${leader.entry_name} (${leader.player_name}) - ${leader.total} pts`;
+} else {
+  document.getElementById("leagueLeader").textContent = "No leader data found ❌";
+}
 
       const h2hLeader = h2h.standings.results[0];
       document.getElementById("h2hLeader").textContent =
