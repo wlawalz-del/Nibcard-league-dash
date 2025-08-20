@@ -1,76 +1,155 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>NIBCARD FPL Dashboard</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Nibcard FPL Dashboard</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      margin: 0; padding: 0;
-      background: linear-gradient(135deg, #f9f9f9, #eaeaea);
-      color: #222;
+    body { background: #f9f9f9; font-family: 'Segoe UI', sans-serif; }
+    .kpi-card { border-radius: 12px; padding: 16px; background: white; box-shadow: 0 4px 8px rgba(0,0,0,0.05); margin-bottom: 16px; }
+    .chart-container { background: white; border-radius: 12px; padding: 16px; margin-top: 20px; box-shadow: 0 4px 8px rgba(0,0,0,0.05); }
+    .sticky-header { position: sticky; top: 0; background: #222; color: white; padding: 10px; z-index: 1000; }
+    .sticky-header h1 { font-size: 20px; margin: 0; }
+  </style>
+</head>
+<body>
+  <div class="sticky-header d-flex justify-content-between align-items-center">
+    <h1>Nibcard FPL Dashboard</h1>
+    <button class="btn btn-sm btn-light" id="shareBtn">📤 Share</button>
+  </div>
+
+  <div class="container my-4">
+    <!-- KPIs -->
+    <div class="row">
+      <div class="col-md-4">
+        <div class="kpi-card text-center">
+          <h5>League Leader</h5>
+          <p id="leagueLeader">Loading…</p>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="kpi-card text-center">
+          <h5>H2H Leader</h5>
+          <p id="h2hLeader">Loading…</p>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="kpi-card text-center">
+          <h5>Most Popular Captain</h5>
+          <p id="captainPick">Loading…</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Charts -->
+    <div class="row">
+      <div class="col-md-6">
+        <div class="chart-container">
+          <h5>Most Points in GW</h5>
+          <canvas id="barChart"></canvas>
+        </div>
+      </div>
+      <div class="col-md-6">
+        <div class="chart-container">
+          <h5>Most Weeks at #1</h5>
+          <canvas id="pieChart"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+  async function loadDashboard() {
+    try {
+      const standingsRes = await fetch('/.netlify/functions/standings?leagueId=543395');
+      const standings = await standingsRes.json();
+
+      const h2hRes = await fetch('/.netlify/functions/h2h?leagueId=1997131');
+      const h2h = await h2hRes.json();
+
+      const captainsRes = await fetch('/.netlify/functions/captains?leagueId=543395');
+      const captains = await captainsRes.json();
+
+      // === KPI CARDS ===
+      try {
+        const leader = standings?.standings?.results?.[0];
+        if (leader) {
+          document.getElementById("leagueLeader").textContent =
+            `${leader.entry_name} (${leader.player_name}) - ${leader.total} pts`;
+        } else {
+          document.getElementById("leagueLeader").textContent =
+            "⚠️ No leader found in standings data";
+        }
+      } catch (err) {
+        document.getElementById("leagueLeader").textContent = "❌ Error loading League Leader";
+      }
+
+      try {
+        const h2hLeader = h2h?.standings?.results?.[0];
+        if (h2hLeader) {
+          document.getElementById("h2hLeader").textContent =
+            `${h2hLeader.entry_name} (${h2hLeader.player_name}) - ${h2hLeader.total} pts`;
+        } else {
+          document.getElementById("h2hLeader").textContent = "⚠️ No H2H leader found";
+        }
+      } catch (err) {
+        document.getElementById("h2hLeader").textContent = "❌ Error loading H2H Leader";
+      }
+
+      const captainPick = captains?.mostPopular || { name: "N/A", count: 0 };
+      document.getElementById("captainPick").textContent =
+        `${captainPick.name} (${captainPick.count} picks)`;
+
+      // === BAR CHART: Best GW ===
+      const gwData = standings?.standings?.results?.map(t => ({
+        label: t.entry_name,
+        score: t.event_total
+      })) || [];
+
+      new Chart(document.getElementById("barChart"), {
+        type: 'bar',
+        data: {
+          labels: gwData.map(d => d.label),
+          datasets: [{
+            label: "GW Score",
+            data: gwData.map(d => d.score),
+            backgroundColor: "#36a2eb"
+          }]
+        },
+        options: { responsive: true, plugins: { legend: { display: false } } }
+      });
+
+      // === PIE CHART: Most Weeks at #1 ===
+      // Use only actual finished gameweeks (event_total > 0)
+      const finished = standings?.standings?.results?.filter(t => t.event_total > 0) || [];
+      const leaderCounts = {};
+      finished.forEach(t => {
+        leaderCounts[t.entry_name] = (leaderCounts[t.entry_name] || 0) + 1;
+      });
+
+      new Chart(document.getElementById("pieChart"), {
+        type: 'pie',
+        data: {
+          labels: Object.keys(leaderCounts),
+          datasets: [{
+            data: Object.values(leaderCounts),
+            backgroundColor: ["#36a2eb","#ff6384","#ffcd56","#4bc0c0","#9966ff"]
+          }]
+        }
+      });
+
+    } catch (err) {
+      console.error("Dashboard error:", err);
+      document.getElementById("leagueLeader").textContent = "❌ Error loading dashboard";
     }
-    header {
-      background: #4e79a7;
-      color: white;
-      padding: 15px;
-      text-align: center;
-      font-size: 1.5em;
-      font-weight: bold;
-      position: sticky;
-      top: 0;
-      z-index: 1000;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-    header button {
-      background: white;
-      border: none;
-      padding: 6px 12px;
-      border-radius: 6px;
-      cursor: pointer;
-    }
-    .container {
-      padding: 20px;
-      max-width: 1000px;
-      margin: auto;
-    }
-    .kpi {
-      display: flex;
-      gap: 15px;
-      flex-wrap: wrap;
-      margin-bottom: 25px;
-    }
-    .card {
-      background: white;
-      padding: 15px;
-      border-radius: 10px;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
-      flex: 1;
-      min-width: 250px;
-      text-align: center;
-      font-size: 1.1em;
-    }
-    canvas {
-      margin-bottom: 30px;
-      background: white;
-      padding: 15px;
-      border-radius: 10px;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
-    }
-    .accordion {
-      margin-top: 20px;
-    }
-    .accordion-item {
-      margin-bottom: 10px;
-      border-radius: 6px;
-      overflow: hidden;
-      border: 1px solid #ddd;
-    }
+  }
+
+  loadDashboard();
+  </script>
+</body>
+</html>
     .accordion-header {
       background: #f4f4f4;
       padding: 10px;
