@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Nibcard FPL Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    .kpi { margin: 10px 0; font-size: 1.2em; }
+    canvas { max-width: 600px; margin: 20px auto; display: block; }
+  </style>
+</head>
+<body>
+  <h1>Nibcard FPL Dashboard</h1>
+
+  <div class="kpi" id="leagueLeader">League Leader: loading…</div>
+  <div class="kpi" id="h2hLeader">H2H Leader: loading…</div>
+  <div class="kpi" id="captain">Most Popular Captain: loading…</div>
+
+  <canvas id="gwChart"></canvas>
+  <canvas id="no1Pie"></canvas>
+
+  <button id="shareBtn">📤 Share Image</button>
+
+  <script>
+    async function loadData() {
+      try {
+        const standings = await fetch("/.netlify/functions/standings").then(r=>r.json());
+        const h2h = await fetch("/.netlify/functions/h2h").then(r=>r.json());
+        const captains = await fetch("/.netlify/functions/captains").then(r=>r.json());
+        const history = await fetch("/.netlify/functions/entryHistory").then(r=>r.json());
+
+        // League leader
+        const leader = standings?.standings?.results?.[0];
+        document.getElementById("leagueLeader").textContent = leader
+          ? `League Leader: ${leader.entry_name} (${leader.player_name}) - ${leader.total} pts`
+          : "League Leader: not found";
+
+        // H2H leader
+        const h2hLeader = h2h?.standings?.results?.[0];
+        document.getElementById("h2hLeader").textContent = h2hLeader
+          ? `H2H Leader: ${h2hLeader.entry_name} (${h2hLeader.player_name}) - ${h2hLeader.points_for} pts`
+          : "H2H Leader: not found";
+
+        // Most popular captain
+        document.getElementById("captain").textContent =
+          `Most Popular Captain: ${captains?.mostPopular?.player_name || "N/A"}`;
+
+        // GW Bar Chart
+        const gwLabels = history?.map(h => "GW" + h.event) || [];
+        const gwScores = history?.map(h => h.points) || [];
+        new Chart(document.getElementById("gwChart"), {
+          type: "bar",
+          data: {
+            labels: gwLabels,
+            datasets: [{ label: "GW Points", data: gwScores, backgroundColor: "steelblue" }]
+          }
+        });
+
+        // No.1 Pie Chart
+        const no1Counts = { "Team A": 1 }; // placeholder
+        new Chart(document.getElementById("no1Pie"), {
+          type: "pie",
+          data: {
+            labels: Object.keys(no1Counts),
+            datasets: [{ data: Object.values(no1Counts), backgroundColor: ["tomato","gold","teal"] }]
+          }
+        });
+
+      } catch (err) {
+        console.error("Dashboard load failed", err);
+      }
+    }
+
+    loadData();
+
+    document.getElementById("shareBtn").addEventListener("click", () => {
+      alert("Share functionality coming soon!");
+    });
+  </script>
+</body>
+</html>
