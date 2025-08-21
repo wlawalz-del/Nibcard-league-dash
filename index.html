@@ -6,21 +6,27 @@
   <title>Nibcard FPL Dashboard</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
-    body { font-family: Arial, sans-serif; margin: 20px; }
-    .kpi { margin: 10px 0; font-size: 1.2em; }
-    canvas { max-width: 600px; margin: 20px auto; display: block; }
+    body { font-family: Arial, sans-serif; margin: 20px; background: #f9f9f9; color: #222; }
+    h1 { text-align: center; margin-bottom: 20px; }
+    .kpi { margin: 10px 0; font-size: 1.1em; padding: 10px; border-radius: 8px; background: #fff; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+    canvas { max-width: 600px; margin: 20px auto; display: block; background: #fff; padding: 10px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+    #shareBtn { display: block; margin: 20px auto; padding: 10px 20px; font-size: 1em; cursor: pointer; border: none; border-radius: 6px; background: steelblue; color: white; }
+    #shareBtn:hover { background: dodgerblue; }
   </style>
 </head>
 <body>
-  <h1>Nibcard FPL Dashboard</h1>
+  <h1>NIBCARD FPL Dashboard</h1>
 
+  <!-- KPI Cards -->
   <div class="kpi" id="leagueLeader">League Leader: loading…</div>
   <div class="kpi" id="h2hLeader">H2H Leader: loading…</div>
   <div class="kpi" id="captain">Most Popular Captain: loading…</div>
 
+  <!-- Charts -->
   <canvas id="gwChart"></canvas>
   <canvas id="no1Pie"></canvas>
 
+  <!-- Share -->
   <button id="shareBtn">📤 Share Image</button>
 
   <script>
@@ -54,17 +60,28 @@
           type: "bar",
           data: {
             labels: gwLabels,
-            datasets: [{ label: "GW Points", data: gwScores, backgroundColor: "steelblue" }]
+            datasets: [{
+              label: "GW Points",
+              data: gwScores,
+              backgroundColor: "steelblue"
+            }]
+          },
+          options: {
+            plugins: { legend: { display: false } },
+            scales: { y: { beginAtZero: true } }
           }
         });
 
-        // No.1 Pie Chart
-        const no1Counts = { "Team A": 1 }; // placeholder
+        // No.1 Pie Chart (placeholder)
+        const no1Counts = { "Team A": 1 }; // later we’ll calculate this properly
         new Chart(document.getElementById("no1Pie"), {
           type: "pie",
           data: {
             labels: Object.keys(no1Counts),
-            datasets: [{ data: Object.values(no1Counts), backgroundColor: ["tomato","gold","teal"] }]
+            datasets: [{
+              data: Object.values(no1Counts),
+              backgroundColor: ["tomato","gold","teal"]
+            }]
           }
         });
 
@@ -72,6 +89,16 @@
         console.error("Dashboard load failed", err);
       }
     }
+
+    loadData();
+
+    // Share button (placeholder)
+    document.getElementById("shareBtn").addEventListener("click", () => {
+      alert("Share functionality coming soon!");
+    });
+  </script>
+</body>
+</html>
 
     loadData();
 
